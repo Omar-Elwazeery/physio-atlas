@@ -80,9 +80,13 @@ npx tsx scripts/check-rig.ts  # joint directions for 14 movements, data keys, no
 - Estimated muscle length changes ignore wrapping around bones and joints, so they are shown only when they agree with
   the movement table.
 
+## Contributing
+
+Contributions are welcome, especially corrections to the clinical content. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Licences
 
-- The application code has no licence file yet; the repository owner should choose one before the repository is shared.
+- The application code is released under the [MIT License](LICENSE).
 - The 3D models in `public/models` are adapted from BodyParts3D, © The Database Center for Life Science, licensed under
   [CC BY-SA 2.1 Japan](https://creativecommons.org/licenses/by-sa/2.1/jp/). Because the licence is Share-Alike, the adapted
   models are offered under the same licence. Attribution is also shown in the app at `/attribution`.
