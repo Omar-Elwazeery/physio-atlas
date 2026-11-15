@@ -18,9 +18,19 @@ function snapshotSpec(kind: ArtKind, s: Structure): SnapshotSpec {
   return { ids: [s.id], size: 400, yaw: 0, pitch: 0, fit: 'body', ghost: 'bones', ghostOpacity: 0.3, highlight: true, back };
 }
 
+/** Longest a queued render waits for the main thread to go idle (ms). */
+const IDLE_TIMEOUT = 400;
+
+/** Runs `fn` when the main thread is next idle (or after IDLE_TIMEOUT); a short timer where the browser has no idle callback. */
+function whenIdle(fn: () => void) {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout: IDLE_TIMEOUT });
+  else setTimeout(fn, 32);
+}
+
 /**
- * Generates and caches the artwork. Renders are queued and run one per animation frame so that a long
- * library list never blocks the interface.
+ * Generates and caches the artwork. Renders are queued and run one at a time, each when the main thread is idle, so
+ * that a long library list never blocks the interface and a movement that is playing keeps its frames. Nothing is
+ * rendered until the viewer has drawn its first frame: the artwork is not on the way to the first paint.
  */
 export class ArtService {
   private cache = new Map<string, string>();
@@ -42,15 +52,15 @@ export class ArtService {
     const s = this.structures.get(spec.id);
     if (!s) return Promise.reject(new Error(`no structure ${spec.id}`));
     const p = new Promise<string>((resolve, reject) => {
-      this.queue.push(() => {
+      // Ligaments and the other second-stage structures may still be loading: wait for their meshes.
+      this.viewer.whenLoaded(spec.id).then(() => { this.queue.push(() => {
         try {
           const url = this.viewer.snapshot(snapshotSpec(spec.kind, s));
           this.cache.set(key, url);
           resolve(url);
         } catch (e) { reject(e); }
         this.pending.delete(key);
-      });
-      this.pump();
+      }); this.pump(); });
     });
     this.pending.set(key, p);
     return p;
@@ -63,8 +73,8 @@ export class ArtService {
       const job = this.queue.shift();
       if (!job) { this.running = false; return; }
       job();
-      requestAnimationFrame(step);
+      whenIdle(step);
     };
-    requestAnimationFrame(step);
+    void this.viewer.whenPainted().then(() => whenIdle(step));
   }
 }

@@ -9,6 +9,13 @@ const sans = DM_Sans({ variable: '--font-sans', subsets: ['latin', 'latin-ext'] 
 export const metadata: Metadata = {
   title: 'Physio Atlas — interactive 3D muscles and movement',
   description: 'Explore every muscle and bone in 3D, move each joint through its range, and see which muscles act.',
+  icons: {
+    icon: [
+      { url: '/icons/icon.svg', type: 'image/svg+xml' },
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 };
 
 export const viewport: Viewport = { themeColor: '#f7f0e7', width: 'device-width', initialScale: 1 };

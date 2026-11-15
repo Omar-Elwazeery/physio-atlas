@@ -59,7 +59,7 @@ export default function LearningCards({ s, reference, onModal, onCompare, onPlay
 
       <article>
         <header><div><em>Clinical notes</em><h3>Common conditions</h3></div><FileText size={17} /></header>
-        <ul>{conditionsOf(s).map((c) => <li key={c}>{c}</li>)}</ul>
+        {conditionsOf(s).length ? <ul>{conditionsOf(s).map((c) => <li key={c}>{c}</li>)}</ul> : <p>Clinical notes for this structure are not written yet.</p>}
         <button onClick={() => onModal('lesson')}>See all <ArrowRight size={14} /></button>
       </article>
 

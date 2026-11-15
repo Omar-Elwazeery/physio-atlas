@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Side, Structure, V3 } from '../types';
-import { DOFS, NODES, dofKey, type AxisId, type Geo, type RigNodeSpec } from './spec';
+import { ARC_STEPS, DOFS, NODES, bulgeScale, dofKey, type AxisId, type Geo, type RigNodeSpec } from './spec';
 
 export interface RigNode {
   id: string;
@@ -19,7 +19,7 @@ export interface RigNode {
   restRad: number;
 }
 
-const ORDER: Record<AxisId, number> = { x: 0, z: 1, y: 2, forearm: 2 };
+const ORDER: Record<AxisId, number> = { x: 0, z: 1, y: 2, forearm: 2, long: 2 };
 const AXES: Record<'x' | 'y' | 'z', THREE.Vector3> = {
   x: new THREE.Vector3(1, 0, 0),
   y: new THREE.Vector3(0, 1, 0),
@@ -40,6 +40,13 @@ export class Rig {
   /** structure id -> node id */
   carriedBy = new Map<string, string>();
   private forearmAxis = new Map<Side, THREE.Vector3>();
+  /**
+   * Long axis of a node with `spec.long` (bind pose, distal -> proximal, so it points up like y). Rotations are composed
+   * in the bone's own frame and applied first (ORDER), so the axial rotation stays about the bone in any pose.
+   */
+  private longAxis = new Map<string, THREE.Vector3>();
+  /** Scale the arc nodes to make up the distance a blend between two of them loses (see `pose`). */
+  arcScale = true;
   /** Keep the lowest foot point on the floor by moving the root vertically. */
   grounding = true;
   private groundPts: { node: RigNode; p: THREE.Vector3 }[] = [];
@@ -67,6 +74,7 @@ export class Rig {
           side,
           s: (key) => this.get(spec.paired ? `${key}-${side}` : key),
           other: (key) => this.get(`${key}-${flip(side)}`),
+          opt: (key) => this.structures.get(spec.paired ? `${key}-${side}` : key),
         };
         const id = nid(spec.id, side);
         const pSpec = spec.parent ? specById.get(spec.parent)! : null;
@@ -104,6 +112,11 @@ export class Rig {
       const a = new THREE.Vector3(...this.get(`radius-${side}`).lm.y1);
       const b = new THREE.Vector3(...this.get(`ulna-${side}`).lm.y0);
       this.forearmAxis.set(side, b.sub(a).normalize());
+    }
+    for (const node of this.nodes.values()) {
+      if (!node.spec.long) continue;
+      const end = this.nodes.get(nid(node.spec.long, node.side));
+      if (end) this.longAxis.set(node.id, node.pivot.clone().sub(end.pivot).normalize());
     }
     this.root.updateMatrixWorld(true);
     this.skeleton = new THREE.Skeleton(this.bones);
@@ -151,7 +164,9 @@ export class Rig {
         const k = c.slice(0, -1);
         for (const sd of ['l', 'r']) if (this.structures.has(`${k}-${sd}`)) out.push(`${k}-${sd}`);
       } else {
-        out.push(spec.paired ? `${c}-${side}` : c);
+        // A carried key the manifest lacks (e.g. the coccyx in a BodyParts3D-only build) is simply not carried.
+        const id = spec.paired ? `${c}-${side}` : c;
+        if (this.structures.has(id)) out.push(id);
       }
     }
     return out;
@@ -189,9 +204,9 @@ export class Rig {
         const v = val(dofKey(d, side));
         if (!v) continue;
         const sgn = d.sign * (d.mirror && side === 'r' ? -1 : 1);
-        const axis = d.axis === 'forearm' ? this.forearmAxis.get(side)! : AXES[d.axis];
         for (const t of d.targets) {
           const id = nid(t.node, d.paired ? side : 'm');
+          const axis = d.axis === 'forearm' ? this.forearmAxis.get(side)! : d.axis === 'long' ? (this.longAxis.get(id) ?? AXES.y) : AXES[d.axis];
           push(id, { order: ORDER[d.axis], axis, rad: THREE.MathUtils.degToRad(v * sgn * t.w) });
         }
       }
@@ -210,9 +225,11 @@ export class Rig {
       if (clav) push(`clavicle-${side}`, { order: ORDER.z, axis: AXES.z, rad: clav });
       if (scap) push(`scapula-${side}`, { order: ORDER.z, axis: AXES.z, rad: scap });
       if (clav + scap) push(`humerus-${side}`, { order: -1, axis: AXES.z, rad: -(clav + scap) });
-      // Patella tracks the knee at about half the angle.
+      // Patella tracks the knee: a fraction of the angle about its own pivot (fitted by the model build so it stays on
+      // the femoral cartilage; half the angle about the knee pivot when the manifest has no fit).
       const knee = val(`knee.flexion-extension.${side}`);
-      if (knee) push(`patella-${side}`, { order: 0, axis: AXES.x, rad: THREE.MathUtils.degToRad(knee * 0.5) });
+      const ratio = this.structures.get(`cartilage-patella-${side}`)?.fit?.track?.ratio ?? 0.5;
+      if (knee) push(`patella-${side}`, { order: 0, axis: AXES.x, rad: THREE.MathUtils.degToRad(knee * ratio) });
     }
 
     for (const node of this.nodes.values()) {
@@ -224,6 +241,20 @@ export class Rig {
         for (const c of list) this.q.multiply(this.tmp.setFromAxisAngle(c.axis, c.rad));
       }
       node.bone.quaternion.copy(this.q);
+    }
+    // Arc nodes: a fraction of their joint's rotation, along the shortest arc from the bind pose. A vertex blended
+    // half-way between two neighbours on the arc, `step` apart, lies cos(step / 2) nearer the joint centre than at
+    // rest; the arc nodes are scaled about the centre by the inverse, so the blend keeps its distance.
+    for (const node of this.nodes.values()) {
+      const b = node.spec.between;
+      if (!b) continue;
+      const of = this.nodes.get(nid(b.of, node.side))!.bone.quaternion;
+      node.bone.quaternion.identity().slerp(of, b.t);
+      const angle = 2 * Math.acos(Math.min(1, Math.abs(of.w)));
+      const c = this.arcScale && b.t > 0 && b.t < 1 ? 1 / Math.cos(angle / (ARC_STEPS + 1) / 2) : 1;
+      // A bulge node (on a hinge about x: the elbow) is also pushed away from the hinge axis, across it only.
+      const s = b.bulge ? bulgeScale(b.bulge, angle) : 1;
+      node.bone.scale.set(c, c * s, c * s);
     }
     this.root.position.copy(this.rootBase);
     this.root.updateMatrixWorld(true);

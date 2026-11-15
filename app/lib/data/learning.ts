@@ -6,7 +6,7 @@ import type { Structure } from '../types';
 
 /** Educational summaries for the learning cards. Not clinical advice; verify against standard texts. */
 
-export type TissueKind = 'muscle' | 'bone' | 'disc' | 'cartilage';
+export type TissueKind = Structure['kind'];
 
 export const TISSUE: Record<TissueKind, { title: string; body: string }> = {
   muscle: {
@@ -25,9 +25,45 @@ export const TISSUE: Record<TissueKind, { title: string; body: string }> = {
     title: 'Hyaline cartilage',
     body: 'Hyaline cartilage is a smooth, flexible tissue made of chondrocytes embedded in a firm collagen and proteoglycan matrix. It has no blood vessels, so it depends on movement and compression to circulate nutrients, and it repairs very slowly. Here it links the ribs to the sternum and lets the chest wall flex when you breathe.',
   },
+  articular: {
+    title: 'Articular (hyaline) cartilage',
+    body: 'Articular cartilage is a thin layer of hyaline cartilage covering the ends of bones in synovial joints. Chondrocytes sit in a collagen and proteoglycan matrix that is smooth and slippery, so the joint surfaces glide with very little friction and loads are spread over the bone beneath. It has no blood vessels or nerves and is nourished by the synovial fluid, which is why it repairs very slowly.',
+  },
+  fibrocartilage: {
+    title: 'Fibrocartilage',
+    body: 'Fibrocartilage combines dense bundles of collagen fibres with rows of cartilage cells, so it resists tension as well as compression. It forms the menisci of the knee, the labra that deepen the shoulder and hip sockets, and the discs inside some joints (wrist, acromioclavicular, sternoclavicular, pubic symphysis), where it improves the fit of the bones and spreads load.',
+  },
+  ligament: {
+    title: 'Dense regular connective tissue',
+    body: 'Ligaments are made of tightly packed collagen fibres running mostly in one direction, with rows of fibroblasts between them. The fibres are slightly wavy at rest and straighten under load, so a ligament gives a little before it becomes stiff. Ligaments join bone to bone and guide and limit joint movement; they have a modest blood supply and heal slowly.',
+  },
+  capsule: {
+    title: 'Joint capsule and synovial membrane',
+    body: 'A synovial joint is enclosed by a capsule with two layers: an outer fibrous layer of dense connective tissue attached to the bones around the joint, often thickened into ligaments, and an inner synovial membrane that lines the joint cavity (except over the articular cartilage) and produces the synovial fluid that lubricates and nourishes the cartilage.',
+  },
+  bursa: {
+    title: 'Synovial bursa',
+    body: 'A bursa is a flat sac lined by synovial membrane and holding a thin film of synovial fluid. Bursae lie where a tendon, muscle or the skin moves over bone or over another tendon, and reduce friction between them. Some communicate with the cavity of a nearby joint.',
+  },
+  sheath: {
+    title: 'Tendon sheath',
+    body: 'Where long tendons cross a joint, as at the wrist, ankle and fingers, they run in synovial sheaths: a tube of synovial membrane folded around the tendon, with fluid between its two layers, so the tendon glides with little friction. In the fingers and toes the sheaths lie inside fibrous tunnels attached to the bones, whose thickenings (pulleys) keep the tendons close to the joints.',
+  },
+  retinaculum: {
+    title: 'Retinaculum',
+    body: 'A retinaculum is a band of thickened deep fascia that crosses a group of tendons and is attached to bone on either side. It holds the tendons close to the joint so that they do not bowstring when the joint moves, as at the wrist and ankle.',
+  },
+  fascia: {
+    title: 'Deep fascia',
+    body: 'Deep fascia is a sheet of dense connective tissue that wraps the muscles of a limb like a sleeve. Intermuscular septa run from it to the bone and divide the limb into compartments of muscles with a shared function and nerve supply. In places it thickens into strong bands and aponeuroses, such as the iliotibial tract and the plantar aponeurosis.',
+  },
+  fatpad: {
+    title: 'Adipose tissue (fat pad)',
+    body: 'A fat pad is a cushion of fat cells held in a framework of connective tissue. Inside some joints, such as the knee, fat pads lie outside the synovial membrane but within the fibrous capsule and fill the spaces that open and close as the joint moves.',
+  },
 };
 
-export const tissueOf = (s: Structure): TissueKind => (s.kind === 'muscle' ? 'muscle' : s.kind);
+export const tissueOf = (s: Structure): TissueKind => s.kind;
 
 // ---- common conditions ---------------------------------------------------------------------------------------
 
@@ -125,6 +161,9 @@ export function conditionsOf(s: Structure): string[] {
   if (s.kind === 'muscle') return MUSCLE_CONDITIONS[s.key] ?? MUSCLE_GROUP_CONDITIONS[muscleInfo(s.key).group] ?? ['Muscle strain', 'Overuse injury', 'Trigger points'];
   if (s.kind === 'disc') return ['Disc herniation', 'Degenerative disc disease', 'Annular tear'];
   if (s.kind === 'cartilage') return ['Costochondritis', 'Tietze syndrome', 'Rib dislocation'];
+  // Joint surfaces and the soft tissue of the joints carry an anatomical description only until someone reviews
+  // clinical content for them.
+  if (s.kind !== 'bone') return [];
   const g = s.group ?? '';
   if (g.startsWith('digit-')) return /hallux|toe/.test(g) ? ['Toe fracture', 'Hallux rigidus', 'Bunion'] : ['Finger fracture', 'Mallet finger', 'Finger joint arthritis'];
   return BONE_GROUP_CONDITIONS[g] ?? ['Fracture', 'Stress injury', 'Arthritis of the nearby joint'];
@@ -172,6 +211,15 @@ export function factOf(s: Structure, region: string): string {
   if (s.kind === 'muscle') return 'There are more than 600 skeletal muscles, which together make up roughly 40% of body weight.';
   if (s.kind === 'disc') return 'The discs account for roughly a quarter of the height of the spine, which is why you are slightly taller in the morning.';
   if (s.kind === 'cartilage') return 'Costal cartilage lets your rib cage expand like a bellows with every breath.';
+  if (s.kind === 'articular') return 'Articular cartilage has no blood vessels or nerves; it is nourished by the synovial fluid of the joint.';
+  if (s.kind === 'fibrocartilage') return 'Fibrocartilage combines dense collagen fibres with cartilage cells, so it resists both compression and tension.';
+  if (s.kind === 'ligament') return 'Ligament collagen is slightly crimped at rest, so a ligament lengthens a little before it becomes stiff.';
+  if (s.kind === 'capsule') return 'The synovial membrane lining a joint capsule makes the synovial fluid that lubricates and nourishes the articular cartilage.';
+  if (s.kind === 'bursa') return 'A bursa holds only a thin film of fluid, just enough to let two surfaces glide past each other.';
+  if (s.kind === 'sheath') return 'A synovial tendon sheath is a closed sac folded around the tendon, so the tendon glides inside two layers of membrane.';
+  if (s.kind === 'retinaculum') return 'Retinacula hold the tendons down at the wrist and ankle so that they do not bowstring when the joint bends.';
+  if (s.kind === 'fascia') return 'Intermuscular septa run from the deep fascia to the bone and divide a limb into muscle compartments.';
+  if (s.kind === 'fatpad') return 'The infrapatellar fat pad lies inside the knee capsule but outside its synovial membrane.';
   const list = REGION_FACTS[region] ?? ['The adult skeleton has 206 bones.'];
   let h = 0;
   for (const c of s.key) h = (h * 31 + c.charCodeAt(0)) >>> 0;

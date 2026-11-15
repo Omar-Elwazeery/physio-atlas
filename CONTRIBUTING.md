@@ -63,6 +63,25 @@ When you change clinical content:
   difference in the pull request.
 - The content is an educational summary and has not been clinically reviewed. Do not add treatment advice or dosing.
 
+## Verifying an entry and recording it
+
+Nobody has checked the muscle entries against a reference yet, and the app says so ("Not yet checked against a reference"
+in the info panel). To change that for a muscle:
+
+1. Compare its `origin`, `insertion`, `innervation` and `action` with one or more of the standard texts listed in
+   `app/lib/data/sources.ts` (add a book there if you used another: authors, title, edition, publisher and year, no page
+   numbers, and leave out an edition or year you are not sure of). Fix anything that disagrees, in your own words.
+2. Add `refs` to the entry: the ids of the sources you actually checked it against, for example
+   `refs: ['gray', 'kendall']`.
+3. Add `reviewed: { by: 'Your Name', date: '2026-03-14' }` (ISO date) only if you did the check yourself. Do not copy
+   these fields from another entry and do not add them for entries you did not read. A reviewer is a person who looked,
+   not a tool.
+4. Run `npm run test:unit`. `tests/sources.test.ts` fails if an entry cites a source that is not in the registry, or
+   is marked reviewed without a reference, a reviewer or a valid date, and prints how many entries have been reviewed.
+
+The nerve-supply layer in the Explore tab is derived from the `innervation` text (`app/lib/nerves.ts`). If you change a
+nerve or root there, the layer follows; keep the "Nerve name (C5–C6)" wording so it still parses (the tests will say if it does not).
+
 ## Code style
 
 - TypeScript throughout. Keep it strictly typed; avoid `any`.

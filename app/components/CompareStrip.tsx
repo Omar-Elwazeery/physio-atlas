@@ -6,9 +6,13 @@ import { muscleInfo } from '../lib/data/muscles';
 import { structureRegion } from '../lib/three/viewer';
 import type { Structure } from '../lib/types';
 import { Art } from './Art';
+import { KINDS } from '../lib/kinds';
+import { jointInfo } from '../lib/data/joints';
 
 const firstSentence = (t: string) => t.split(/(?<=[.;])\s/)[0].replace(/[.;]$/, '');
-const role = (s: Structure) => (s.kind === 'muscle' ? firstSentence(muscleInfo(s.key).action) : `A bone of the ${structureRegion(s).toLowerCase()}`);
+const role = (s: Structure) => (s.kind === 'muscle' ? firstSentence(muscleInfo(s.key).action)
+  : KINDS[s.kind].library === 'joint' ? firstSentence(jointInfo(s).description)
+    : s.kind === 'bone' ? `A bone of the ${structureRegion(s).toLowerCase()}` : `${KINDS[s.kind].label}, ${structureRegion(s).toLowerCase()}`);
 const sideTag = (s: Structure) => (s.side === 'l' ? ' (left)' : s.side === 'r' ? ' (right)' : '');
 
 /** Floating strip that sets the selected structure beside a reference structure. */

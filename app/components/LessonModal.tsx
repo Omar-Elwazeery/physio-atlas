@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, Play, X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useDialog } from '../hooks/useDialog';
 import { conditionsOf, jointsCrossed, TISSUE, tissueOf } from '../lib/data/learning';
 import { muscleInfo, hasMuscleInfo } from '../lib/data/muscles';
 import { movementsOfMuscle, type Dir } from '../lib/roles';
@@ -22,11 +22,7 @@ interface Props {
 }
 
 export default function LessonModal({ type, s, onClose, onPlay }: Props) {
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, [onClose]);
+  const dialog = useDialog<HTMLElement>(onClose);
 
   const region = structureRegion(s);
   const info = s.kind === 'muscle' && hasMuscleInfo(s.key) ? muscleInfo(s.key) : null;
@@ -35,11 +31,11 @@ export default function LessonModal({ type, s, onClose, onPlay }: Props) {
   const tissue = TISSUE[tissueOf(s)];
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className={`learning-modal ${type === 'system' ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
-        <span className="modal-icon">{ICON[type]}</span>
-        <em>guided</em>
+    <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) { e.preventDefault(); onClose(); } }}>
+      <section ref={dialog} className={`learning-modal ${type === 'system' ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button type="button" className="modal-close" onClick={onClose} aria-label="Close dialog"><X size={18} aria-hidden="true" /></button>
+        <span className="modal-icon" aria-hidden="true">{ICON[type]}</span>
+        <em aria-hidden="true">guided</em>
         <h2 id="modal-title">{title}</h2>
 
         {type === 'lesson' && (
@@ -58,12 +54,12 @@ export default function LessonModal({ type, s, onClose, onPlay }: Props) {
               <p>{s.label} is part of the {region.toLowerCase()}. Choose a movement to see how it moves with the joints around it.</p>
             )}
             <div className="modal-pair">
-              <figure><div className="modal-demo"><Art spec={{ kind: 'organ', id: s.id }} label={s.label} /></div><figcaption>{s.label}</figcaption></figure>
+              <figure><div className="modal-demo" aria-hidden="true"><Art spec={{ kind: 'organ', id: s.id }} label={s.label} /></div><figcaption>{s.label}</figcaption></figure>
               <figure><div className="modal-demo tissue"><TissueArt kind={tissueOf(s)} /></div><figcaption>{tissue.title}</figcaption></figure>
             </div>
             <p><strong>Tissue.</strong> {tissue.body}</p>
             <h3 className="modal-sub">Common conditions</h3>
-            <ul className="modal-list">{conditionsOf(s).map((c) => <li key={c}>{c}</li>)}</ul>
+            {conditionsOf(s).length ? <ul className="modal-list">{conditionsOf(s).map((c) => <li key={c}>{c}</li>)}</ul> : <p>Clinical notes for this structure are not written yet.</p>}
             {info?.note && <p className="modal-note"><b>Clinical note</b> {info.note}</p>}
           </>
         )}
@@ -71,14 +67,14 @@ export default function LessonModal({ type, s, onClose, onPlay }: Props) {
         {type === 'animation' && (
           <>
             <p>Pick a movement and watch the joint move through its range while the muscles that work light up in the Movement view.</p>
-            <div className="modal-demo moving"><Art spec={{ kind: 'organ', id: s.id }} label={s.label} /></div>
+            <div className="modal-demo moving" aria-hidden="true"><Art spec={{ kind: 'organ', id: s.id }} label={s.label} /></div>
             {moves.length > 0 ? (
               <ul className="modal-moves">
                 {moves.map((m) => (
                   <li key={`${m.joint}.${m.dof.id}.${m.dir}`}>
                     <span className={`role ${m.role}`}>{m.role === 'prime' ? 'Prime' : m.role === 'assist' ? 'Assists' : 'Stabilizes'}</span>
                     <span>{m.name}</span>
-                    <button onClick={() => { onPlay({ joint: m.joint, dof: m.dof.id, dir: m.dir }, (m.dir === 'pos' ? m.dof.max : m.dof.min) * 0.75); onClose(); }} aria-label={`Play ${m.name}`}><Play size={13} /></button>
+                    <button type="button" onClick={() => { onPlay({ joint: m.joint, dof: m.dof.id, dir: m.dir }, (m.dir === 'pos' ? m.dof.max : m.dof.min) * 0.75); onClose(); }} aria-label={`Play ${m.name}`}><Play size={13} aria-hidden="true" /></button>
                   </li>
                 ))}
               </ul>
@@ -89,7 +85,7 @@ export default function LessonModal({ type, s, onClose, onPlay }: Props) {
         {type === 'system' && (
           <>
             <p>{info ? `Here is where the ${lc(s.label)} sits in the body, highlighted against the skeleton.` : `Here is where the ${lc(s.label)} sits in the skeleton.`}</p>
-            <figure className="modal-figure"><Art spec={{ kind: 'location', id: s.id }} label={s.label} /></figure>
+            <figure className="modal-figure" role="img" aria-label={`${s.label}, highlighted in the ${info ? 'body' : 'skeleton'}`}><Art spec={{ kind: 'location', id: s.id }} label={s.label} /></figure>
             <dl className="modal-facts">
               <div><dt>Region</dt><dd>{region}</dd></div>
               <div><dt>Crosses</dt><dd>{s.kind === 'muscle' ? jointsCrossed(s).join(', ') : s.group ?? '—'}</dd></div>
@@ -98,7 +94,7 @@ export default function LessonModal({ type, s, onClose, onPlay }: Props) {
           </>
         )}
 
-        <button className="lesson-button" onClick={onClose}>Continue exploring <ArrowRight size={16} /></button>
+        <button type="button" className="lesson-button" onClick={onClose}>Continue exploring <ArrowRight size={16} aria-hidden="true" /></button>
       </section>
     </div>
   );
