@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type SetStateAction } from 'react';
 import Link from 'next/link';
 import { Activity, Bone, Box, Check, ChevronsLeftRight, Eye, GraduationCap, Link2, MoveHorizontal, RotateCcw, Search, User } from 'lucide-react';
 import type { ROLE_PALETTES, PaletteName, VisState } from '../lib/three/viewer';
@@ -21,6 +21,7 @@ import ExplorePanel from './ExplorePanel';
 import MovementPanel from './MovementPanel';
 import QuizPanel, { QuizWelcome } from './QuizPanel';
 import InfoPanel from './InfoPanel';
+import QuickCard from './QuickCard';
 import SearchDialog from './SearchDialog';
 import LearningCards, { type ModalType } from './LearningCards';
 import CompareStrip from './CompareStrip';
@@ -62,8 +63,16 @@ export default function PhysioApp() {
   /** A quiz question is pending: nothing may be selected, searched or hovered, because that would name the answer. */
   const blind = quizTab && quiz.locked;
 
+  /** Structure picked on the model itself: it gets a summary card over the view (the info panel may be off screen). */
+  const [cardId, setCardId] = useState<string | null>(null);
+  /** The card opens on the half of the view away from the tap, so it never covers what was just picked. */
+  const [cardTop, setCardTop] = useState(false);
+  const onViewerPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setCardTop(e.clientY - r.top > r.height / 2);
+  }, []);
   const { viewerRef, viewer, ready, progress, error, structures, art } = useViewer(canvasRef, {
-    onSelect: (id) => { if (!clickSink.current?.(id)) dispatch({ type: 'select', id }); },
+    onSelect: (id) => { if (!clickSink.current?.(id)) { dispatch({ type: 'select', id }); setCardId(id); } },
     onHover: (id, x, y) => hoverSink.current?.(id ? { id, x, y } : null),
   });
   const { pose, active, setActive, restrict, setRestrict, setDof, animatePose, resetPose, replacePose, currentPose } = usePose(viewer);
@@ -251,6 +260,12 @@ export default function PhysioApp() {
   }, [catalog]);
 
   const selName = selStruct ? structureName(selStruct) : null;
+  const cardStruct = !quizTab && cardId && cardId === selected ? selStruct : null;
+  const showDetails = useCallback(() => {
+    setCardId(null);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.querySelector('.info-panel')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }, []);
   const announcement = blind ? '' : selStruct
     ? `Selected: ${selName}${stepInfo?.id === selStruct.id ? `, ${stepInfo.index + 1} of ${stepInfo.count}` : ''}`
     : ready ? 'No structure selected' : '';
@@ -306,7 +321,7 @@ export default function PhysioApp() {
 
         <section className="viewer-shell">
           <div className="viewer-glow" aria-hidden />
-          <div className="three-mount">
+          <div className="three-mount" onPointerUpCapture={onViewerPointerUp}>
             <canvas ref={canvasRef} tabIndex={0} onKeyDown={onCanvasKey}
               aria-label={`3D anatomy viewer${quiz.highlight && quizTab ? '. A structure is highlighted for the quiz question' : selName ? `. Selected: ${selName}` : ''}`} aria-describedby="viewer-keys" />
           </div>
@@ -328,6 +343,8 @@ export default function PhysioApp() {
             <span aria-hidden><Eye size={13} /> tip</span>
             <p>{TIPS[tab]}</p>
           </div>
+
+          {cardStruct && <QuickCard key={cardStruct.id} s={cardStruct} top={cardTop} onClose={() => setCardId(null)} onDetails={showDetails} />}
 
           {active && tab === 'move' && <Legend palette={palette} setPalette={setPalette} colors={colors} />}
 

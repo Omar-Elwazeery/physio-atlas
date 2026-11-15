@@ -539,3 +539,41 @@ button.lesson-button:disabled { opacity: .5; }
 .nerve-chip.on { color: var(--ink); background: rgba(31, 157, 143, .14); border-color: rgba(31, 157, 143, .6); }
 .sources { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: #6b625a; font: 12.5px/1.4 var(--sans); }
 .info-panel .hint a { color: var(--lavender); }
+
+/* --- quick card: name + brief over the viewer after a tap / click on the model --- */
+.quick-card {
+  position: absolute; left: 50%; bottom: 66px; z-index: 5; transform: translateX(-50%);
+  width: min(340px, calc(100% - 220px)); padding: 14px 16px 12px;
+  background: rgba(255, 252, 247, .96); border: 1px solid var(--line); border-radius: 18px;
+  box-shadow: 0 14px 34px rgba(83, 59, 42, .16); backdrop-filter: blur(10px);
+}
+.quick-kicker { display: block; padding-right: 30px; color: #795c55; font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: .13em; }
+.quick-card h3 { margin: 6px 0 0; padding-right: 26px; font: 500 24px/1.05 var(--serif); letter-spacing: -.01em; }
+.quick-card em { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.quick-card p {
+  margin: 8px 0 0; color: #4a423c; font: 13.5px/1.45 var(--sans);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden;
+}
+.quick-close { position: absolute; top: 6px; inset-inline-end: 6px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
+.quick-close:hover { background: rgba(116, 89, 67, .09); }
+.quick-more { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 12px; border: 1px solid rgba(215, 112, 91, .35); border-radius: 12px; background: rgba(253, 234, 226, .7); color: var(--ink); font: 500 13px var(--sans); }
+.quick-more:hover { background: rgba(253, 234, 226, 1); }
+.quick-close:focus-visible, .quick-more:focus-visible { outline: 2px solid var(--lavender); outline-offset: 2px; }
+/* Wide screens show the full info panel right beside the viewer, so the jump button has nothing to do. */
+@media (min-width: 1041px) { .quick-more { display: none; } }
+.quick-card.top { bottom: auto; top: 18px; z-index: 6; }
+@media (max-width: 760px) {
+  /* Phones: a bottom sheet across the viewer, over the view caption and auto-rotate switch while it is open. */
+  .quick-card { left: 10px; right: 10px; bottom: 10px; width: auto; transform: none; border-radius: 16px; padding: 12px 14px 12px; }
+  .quick-card h3 { font-size: 22px; }
+  .quick-card p { -webkit-line-clamp: 3; line-clamp: 3; }
+  .quick-close { width: 44px; height: 44px; top: 2px; inset-inline-end: 2px; }
+  .quick-more { min-height: 44px; }
+  .quick-card.top { top: 10px; bottom: auto; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .quick-card { animation: quick-in .22s cubic-bezier(.2, .8, .3, 1); }
+  @media (max-width: 760px) { .quick-card { animation-name: quick-in-sheet; } }
+}
+@keyframes quick-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@keyframes quick-in-sheet { from { opacity: 0; transform: translateY(12px); } }

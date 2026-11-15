@@ -912,10 +912,12 @@ export class Viewer {
     return (this.pickables[idx - 1]?.userData.id as string) ?? null;
   }
 
-  private onDown = (e: PointerEvent) => { this.down = { x: e.clientX, y: e.clientY }; };
+  // A second finger (pinch zoom) cancels the tap, so lifting the fingers does not select what is under them.
+  private onDown = (e: PointerEvent) => { this.down = e.isPrimary ? { x: e.clientX, y: e.clientY } : null; };
   private onUp = (e: PointerEvent) => {
     const d = this.down; this.down = null;
-    if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return;
+    // Fingers drift more than a mouse during a tap.
+    if (!d || !e.isPrimary || Math.hypot(e.clientX - d.x, e.clientY - d.y) > (e.pointerType === 'mouse' ? 5 : 10)) return;
     this.cb.onSelect?.(this.pickAt(e.clientX, e.clientY));
   };
   private onMove = (e: PointerEvent) => {
