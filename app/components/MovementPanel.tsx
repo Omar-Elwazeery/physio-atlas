@@ -84,10 +84,10 @@ export default function MovementPanel({ pose, setDof, animatePose, resetPose, ac
       {acting && active && activeDof && (
         <section className="acting" aria-live="polite">
           <h2>{(JOINTS.find((j) => j.id === active.joint)?.label ?? '')}: {active.dir === 'pos' ? activeDof.pos : activeDof.neg}</h2>
-          {acting.prime.length > 0 && <p><i className="dot" style={{ background: '#ef4444' }} /><b>Prime movers</b> {acting.prime.join(', ')}</p>}
-          {acting.assist.length > 0 && <p><i className="dot" style={{ background: '#f59e0b' }} /><b>Synergists</b> {acting.assist.join(', ')}</p>}
-          {acting.stab.length > 0 && <p><i className="dot" style={{ background: '#facc15' }} /><b>Stabilizers</b> {acting.stab.join(', ')}</p>}
-          <p><i className="dot" style={{ background: '#3b82f6' }} /><b>Antagonists</b> the opposite movement&apos;s prime movers (blue)</p>
+          {acting.prime.length > 0 && <p><i className="dot" style={{ background: 'var(--role-prime)' }} /><b>Prime movers</b> {acting.prime.join(', ')}</p>}
+          {acting.assist.length > 0 && <p><i className="dot" style={{ background: 'var(--role-assist)' }} /><b>Synergists</b> {acting.assist.join(', ')}</p>}
+          {acting.stab.length > 0 && <p><i className="dot" style={{ background: 'var(--role-stab)' }} /><b>Stabilizers</b> {acting.stab.join(', ')}</p>}
+          <p><i className="dot" style={{ background: 'var(--role-antagonist)' }} /><b>Antagonists</b> the opposite movement&apos;s prime movers</p>
         </section>
       )}
 
@@ -115,7 +115,7 @@ export default function MovementPanel({ pose, setDof, animatePose, resetPose, ac
                         <div key={side} className="slider">
                           <div className="slider-head">
                             {d.paired && <span className="side-tag">{side === 'l' ? 'Left' : 'Right'}</span>}
-                            <output>{Math.abs(Math.round(v)) === 0 ? 'Neutral' : `${v > 0 ? d.pos : d.neg} ${Math.abs(Math.round(v))}°`}</output>
+                            <output aria-live="off">{Math.abs(Math.round(v)) === 0 ? 'Neutral' : `${v > 0 ? d.pos : d.neg} ${Math.abs(Math.round(v))}°`}</output>
                             <span className="pct">{Math.round(pct)}% of normal</span>
                             <button className="play" onClick={() => play(d, side)} aria-label={`Play ${d.label}`} title="Play through the range">▶</button>
                           </div>

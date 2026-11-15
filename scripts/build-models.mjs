@@ -1,5 +1,11 @@
 // Builds public/models/{skeleton,muscles}.glb + structures.json from the BodyParts3D cache.
 // Usage: npm run models   (expects .cache/bp3d/ from the downloader, see README)
+// Optional environment overrides, for experiments:
+//   MODELS_OUT=<dir>     write the three files there instead of public/models (and skip the public/draco copy)
+//   MODELS_DETAIL=<k>    multiply the simplification ratios by k (ratios are capped at 1 = source meshes)
+//   MODELS_NORMALS=1     bake smooth vertex normals into the GLBs. Off by default: the viewer computes the same
+//                        normals on load in ~50 ms, while baking adds ~50 % to the download (~12 % with Draco speed 0,
+//                        at ~3.5x the decode time) for no visible difference.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, copyFileSync, statSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +19,11 @@ import { makeSchematic } from './schematic.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = join(ROOT, '.cache', 'bp3d');
 const OBJ_DIR = join(CACHE, 'extract', 'isa_BP3D_4.0_obj_99');
-const OUT = join(ROOT, 'public', 'models');
+const DEFAULT_OUT = join(ROOT, 'public', 'models');
+const OUT = process.env.MODELS_OUT ? resolve(process.env.MODELS_OUT) : DEFAULT_OUT;
+const DETAIL = Number(process.env.MODELS_DETAIL ?? 1);
+if (!(DETAIL > 0)) throw new Error(`MODELS_DETAIL must be a positive number, got ${process.env.MODELS_DETAIL}`);
+const BAKE_NORMALS = process.env.MODELS_NORMALS === '1';
 mkdirSync(OUT, { recursive: true });
 
 const have = new Set(readdirSync(OBJ_DIR).filter((f) => f.endsWith('.obj')).map((f) => f.slice(0, -4)));
@@ -129,7 +139,46 @@ function simplify(pos, idx, ratio) {
   return { pos: new Float32Array(np), idx: ni };
 }
 
-const RATIO = { muscle: 0.5, bone: 0.4, disc: 0.5, cartilage: 0.5 };
+const RATIO = Object.fromEntries(Object.entries({ muscle: 0.5, bone: 0.4, disc: 0.5, cartilage: 0.5 }).map(([k, r]) => [k, Math.min(1, r * DETAIL)]));
+
+/** Merges vertices with identical positions (and drops unreferenced ones). Triangles are unchanged. */
+function weld(pos, idx) {
+  const map = new Map();
+  const remap = new Int32Array(pos.length / 3).fill(-1);
+  const np = [];
+  const ni = new Uint32Array(idx.length);
+  for (let i = 0; i < idx.length; i++) {
+    const v = idx[i];
+    if (remap[v] < 0) {
+      const k = `${pos[v * 3]},${pos[v * 3 + 1]},${pos[v * 3 + 2]}`;
+      let r = map.get(k);
+      if (r === undefined) { r = np.length / 3; map.set(k, r); np.push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]); }
+      remap[v] = r;
+    }
+    ni[i] = remap[v];
+  }
+  return { pos: new Float32Array(np), idx: ni };
+}
+
+/**
+ * Smooth vertex normals: the area-weighted sum of the face normals around each (welded) vertex, the same
+ * rule as three's BufferGeometry.computeVertexNormals(). Computed on the final, simplified, y-up mesh.
+ */
+function vertexNormals(pos, idx) {
+  const n = new Float32Array(pos.length);
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+    const e1x = pos[b] - pos[a], e1y = pos[b + 1] - pos[a + 1], e1z = pos[b + 2] - pos[a + 2];
+    const e2x = pos[c] - pos[a], e2y = pos[c + 1] - pos[a + 1], e2z = pos[c + 2] - pos[a + 2];
+    const fx = e1y * e2z - e1z * e2y, fy = e1z * e2x - e1x * e2z, fz = e1x * e2y - e1y * e2x;
+    for (const v of [a, b, c]) { n[v] += fx; n[v + 1] += fy; n[v + 2] += fz; }
+  }
+  for (let i = 0; i < n.length; i += 3) {
+    const l = Math.hypot(n[i], n[i + 1], n[i + 2]);
+    if (l > 0) { n[i] /= l; n[i + 1] /= l; n[i + 2] /= l; } else n[i + 1] = 1; // isolated vertex: any unit vector
+  }
+  return n;
+}
 
 const io = new NodeIO().registerExtensions([KHRDracoMeshCompression]).registerDependencies({
   'draco3d.encoder': await draco3d.createEncoderModule(),
@@ -166,13 +215,17 @@ function landmarks(arrays, min, max) {
 function buildDoc(kinds, label) {
   const doc = new Document();
   doc.createExtension(KHRDracoMeshCompression).setRequired(true).setEncoderOptions({
-    method: KHRDracoMeshCompression.EncoderMethod.EDGEBREAKER, encodeSpeed: 5, decodeSpeed: 5, quantizePosition: 14,
+    method: KHRDracoMeshCompression.EncoderMethod.EDGEBREAKER, encodeSpeed: 5, decodeSpeed: 5,
+    // (gltf-transform reads `quantizationBits`; an earlier `quantizePosition: 14` here was silently ignored, and
+    // 14 is also the default, so the shipped files are unchanged.) NORMAL only applies with MODELS_NORMALS=1.
+    quantizationBits: { POSITION: 14, NORMAL: 10 },
   });
   const buffer = doc.createBuffer();
   const mat = doc.createMaterial('base').setBaseColorFactor([0.85, 0.8, 0.75, 1]).setRoughnessFactor(0.7).setMetallicFactor(0);
   const scene = doc.createScene(label);
   const manifest = [];
   let tris = 0;
+  let verts = 0;
   for (const s of [...structures.values()].filter((x) => kinds.includes(x.kind)).sort((a, b) => a.id.localeCompare(b.id))) {
     const node = doc.createNode(s.id).setExtras({ id: s.id, kind: s.kind });
     scene.addChild(node);
@@ -202,14 +255,19 @@ function buildDoc(kinds, label) {
       o = 0;
       for (const i of I) { idx.set(i, o); o += i.length; }
       for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], pos[i + k]); max[k] = Math.max(max[k], pos[i + k]); }
-      allPos.push(pos);
-      const acc = doc.createAccessor().setType('VEC3').setArray(pos).setBuffer(buffer);
-      const iacc = doc.createAccessor().setType('SCALAR').setArray(idx).setBuffer(buffer);
+      allPos.push(pos); // landmarks use the unwelded vertices, as they always have
+      // The source OBJs repeat a vertex wherever its normal or texture coordinate changes, and Draco merges those
+      // copies again on decode. Weld them first so baked normals are smooth across those seams, like the runtime ones.
+      const g = BAKE_NORMALS ? weld(pos, idx) : { pos, idx };
+      const acc = doc.createAccessor().setType('VEC3').setArray(g.pos).setBuffer(buffer);
+      const iacc = doc.createAccessor().setType('SCALAR').setArray(g.idx).setBuffer(buffer);
       const prim = doc.createPrimitive().setAttribute('POSITION', acc).setIndices(iacc).setMaterial(mat);
+      if (BAKE_NORMALS) prim.setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(vertexNormals(g.pos, g.idx)).setBuffer(buffer));
       const mesh = doc.createMesh(`${s.id}:${pk}`).addPrimitive(prim);
       node.addChild(doc.createNode(`${s.id}:${pk}`).setMesh(mesh).setExtras({ part: pk }));
       parts.push({ key: pk, label: part.label, tris: idx.length / 3 });
       tris += idx.length / 3;
+      verts += g.pos.length / 3;
     }
     manifest.push({
       id: s.id, key: s.key, kind: s.kind, side: s.side, label: s.label, group: s.group, parts, ...(s.schematic ? { schematic: true } : {}),
@@ -217,7 +275,7 @@ function buildDoc(kinds, label) {
       lm: landmarks(allPos, min, max),
     });
   }
-  return { doc, manifest, tris };
+  return { doc, manifest, tris, verts };
 }
 
 // ---- 4. schematic muscles for structures BodyParts3D lacks ---------------------------------------------
@@ -259,11 +317,13 @@ const mu = buildDoc(['muscle'], 'muscles');
 await io.write(join(OUT, 'skeleton.glb'), sk.doc);
 await io.write(join(OUT, 'muscles.glb'), mu.doc);
 writeFileSync(join(OUT, 'structures.json'), JSON.stringify([...sk.manifest, ...mu.manifest]));
-console.log(`skeleton: ${sk.manifest.length} structures, ${sk.tris} tris, ${(statSync(join(OUT, 'skeleton.glb')).size / 1e6).toFixed(1)} MB`);
-console.log(`muscles:  ${mu.manifest.length} structures, ${mu.tris} tris, ${(statSync(join(OUT, 'muscles.glb')).size / 1e6).toFixed(1)} MB`);
+console.log(`skeleton: ${sk.manifest.length} structures, ${sk.tris} tris, ${sk.verts} verts, ${(statSync(join(OUT, 'skeleton.glb')).size / 1e6).toFixed(1)} MB`);
+console.log(`muscles:  ${mu.manifest.length} structures, ${mu.tris} tris, ${mu.verts} verts, ${(statSync(join(OUT, 'muscles.glb')).size / 1e6).toFixed(1)} MB`);
 
-// Draco decoder for the browser (three's GLTFLoader).
-const dracoSrc = join(ROOT, 'node_modules', 'three', 'examples', 'jsm', 'libs', 'draco', 'gltf');
-const dracoDst = join(ROOT, 'public', 'draco');
-mkdirSync(dracoDst, { recursive: true });
-for (const f of readdirSync(dracoSrc)) copyFileSync(join(dracoSrc, f), join(dracoDst, f));
+// Draco decoder for the browser (three's GLTFLoader). Only a build into public/models refreshes it.
+if (OUT === DEFAULT_OUT) {
+  const dracoSrc = join(ROOT, 'node_modules', 'three', 'examples', 'jsm', 'libs', 'draco', 'gltf');
+  const dracoDst = join(ROOT, 'public', 'draco');
+  mkdirSync(dracoDst, { recursive: true });
+  for (const f of readdirSync(dracoSrc)) copyFileSync(join(dracoSrc, f), join(dracoDst, f));
+}

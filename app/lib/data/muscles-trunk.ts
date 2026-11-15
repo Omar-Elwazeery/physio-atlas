@@ -1,4 +1,5 @@
 import type { MuscleInfo } from '../types';
+import type { StrainLandmark } from '../strain';
 import { CERVICAL, LUMBAR, THORACIC } from '../rig/spec';
 
 const T = 'Trunk' as const;
@@ -6,6 +7,12 @@ const H = 'Head & neck' as const;
 const NECK = [...CERVICAL, 'skull'];
 const ERECTOR_ORIGIN = 'Common origin: iliac crest, sacrum, lumbar and lower thoracic spinous processes, thoracolumbar fascia';
 const DORSAL = 'Dorsal rami of spinal nerves';
+// Ends of the masseter's length line (MuscleInfo.strainOrigin, strainInsertion): the end picked from the model's
+// masseter lies behind the jaw joint, so opening the mouth read as shortening.
+/** The lower border of the zygomatic bone, where the superficial masseter arises. */
+const ZYGOMATIC_LOWER_BORDER: StrainLandmark = { bone: 'skull-zygomatic', toward: ['inferior', 'lateral'] };
+/** The angle of the mandible, where it inserts. */
+const MANDIBULAR_ANGLE: StrainLandmark = { bone: 'mandible', toward: ['inferior', 'posterior', 'lateral'] };
 
 /** Clinical data, trunk and head & neck. Educational summary; verify against Gray's / Kendall. */
 export const TRUNK: Record<string, MuscleInfo> = {
@@ -33,7 +40,7 @@ export const TRUNK: Record<string, MuscleInfo> = {
   'scalenus-anterior': { group: 'Scalenes', region: H, origin: 'Anterior tubercles of C3–C6 transverse processes', insertion: 'Scalene tubercle of first rib', innervation: 'Anterior rami (C4–C6)', action: 'Elevates the first rib; neck flexion and lateral flexion', spine: ['sternum', ...CERVICAL], note: 'The subclavian vein passes in front of it, the artery and brachial plexus behind.' },
   'scalenus-medius': { group: 'Scalenes', region: H, origin: 'Posterior tubercles of C2–C7 transverse processes', insertion: 'Upper surface of first rib, behind the subclavian groove', innervation: 'Anterior rami (C3–C8)', action: 'Elevates the first rib; neck lateral flexion', spine: ['sternum', ...CERVICAL] },
   'scalenus-posterior': { group: 'Scalenes', region: H, origin: 'Posterior tubercles of C4–C6 transverse processes', insertion: 'Outer surface of second rib', innervation: 'Anterior rami (C6–C8)', action: 'Elevates the second rib; neck lateral flexion', spine: ['sternum', ...CERVICAL] },
-  sternocleidomastoid: { group: 'Neck: superficial', region: H, origin: 'Sternal head: manubrium. Clavicular head: medial third of clavicle', insertion: 'Mastoid process and lateral superior nuchal line', innervation: 'Spinal accessory nerve (CN XI); C2–C3', action: 'Unilateral: lateral flexion to the same side, rotation to the opposite side. Bilateral: neck flexion; accessory muscle of inspiration.', spine: ['sternum', ...NECK], note: 'Shortening on one side produces torticollis.' },
+  sternocleidomastoid: { group: 'Neck: superficial', region: H, origin: 'Sternal head: manubrium. Clavicular head: medial third of clavicle', insertion: 'Mastoid process and lateral superior nuchal line', innervation: 'Spinal accessory nerve (CN XI); C2–C3 (proprioception)', action: 'Unilateral: lateral flexion to the same side, rotation to the opposite side. Bilateral: neck flexion; accessory muscle of inspiration.', spine: ['sternum', ...NECK], note: 'Shortening on one side produces torticollis.' },
   platysma: { group: 'Neck: superficial', region: H, origin: 'Fascia over pectoralis major and deltoid', insertion: 'Mandible and skin of the lower face', innervation: 'Facial nerve, cervical branch (CN VII)', action: 'Depresses the mandible and tenses the neck skin', carrier: 'c5' },
   digastric: { group: 'Suprahyoid', region: H, origin: 'Posterior belly: mastoid notch. Anterior belly: digastric fossa of mandible', insertion: 'Intermediate tendon at the hyoid bone', innervation: 'Posterior belly: facial nerve. Anterior belly: mylohyoid nerve (CN V3)', action: 'Depresses the mandible (opens the mouth); elevates the hyoid', chain: ['skull', 'mandible'] },
   mylohyoid: { group: 'Suprahyoid', region: H, origin: 'Mylohyoid line of mandible', insertion: 'Hyoid bone and median raphe', innervation: 'Mylohyoid nerve (CN V3)', action: 'Elevates the floor of the mouth and hyoid; depresses the mandible', carrier: 'mandible' },
@@ -56,7 +63,7 @@ export const TRUNK: Record<string, MuscleInfo> = {
   'transversus-abdominis': { group: 'Abdominal wall', region: T, origin: 'Inner surface of costal cartilages 7–12, thoracolumbar fascia, iliac crest, inguinal ligament', insertion: 'Linea alba via the aponeurosis, pubic crest', innervation: 'Thoracoabdominal nerves (T7–T12), iliohypogastric and ilioinguinal nerves (L1)', action: 'Compresses the abdomen; stabilizes the lumbar spine (the "drawing-in" manoeuvre)', spine: ['pelvis', ...LUMBAR, ...THORACIC.slice(0, 6)] },
   'quadratus-lumborum': { group: 'Posterior abdominal wall', region: T, origin: 'Iliac crest and iliolumbar ligament', insertion: '12th rib and transverse processes of L1–L4', innervation: 'Anterior rami of T12–L4', action: 'Ipsilateral lateral flexion ("hip hiking"); fixes the 12th rib; assists lumbar extension', spine: ['pelvis', ...LUMBAR, 't12'] },
   multifidus: { group: 'Transversospinalis', region: T, origin: 'Sacrum, posterior iliac spine, transverse processes of lumbar and thoracic vertebrae, articular processes of C4–C7', insertion: 'Spinous processes two to four segments above', innervation: DORSAL, action: 'Segmental stabilization and extension of the spine; contralateral rotation', spine: ['pelvis', ...LUMBAR, ...THORACIC, ...CERVICAL.slice(0, 6)], note: 'Atrophy and fatty infiltration are linked to recurrent low back pain.' },
-  masseter: { group: 'Mastication', region: H, origin: 'Zygomatic arch', insertion: 'Lateral surface of the ramus and angle of the mandible', innervation: 'Masseteric nerve (CN V3)', action: 'Elevates the mandible (closes the jaw); assists protrusion', chain: ['skull', 'mandible'] },
+  masseter: { group: 'Mastication', region: H, origin: 'Zygomatic arch', insertion: 'Lateral surface of the ramus and angle of the mandible', innervation: 'Masseteric nerve (CN V3)', action: 'Elevates the mandible (closes the jaw); assists protrusion', chain: ['skull', 'mandible'], strainOrigin: ZYGOMATIC_LOWER_BORDER, strainInsertion: MANDIBULAR_ANGLE },
   temporalis: { group: 'Mastication', region: H, origin: 'Temporal fossa and temporal fascia', insertion: 'Coronoid process and anterior border of the ramus of the mandible', innervation: 'Deep temporal nerves (CN V3)', action: 'Elevates the mandible; posterior fibres retract it', chain: ['skull', 'mandible'] },
   'interspinalis-thoracis': { group: 'Deep spinal', region: T, origin: 'Spinous process of one vertebra', insertion: 'Spinous process of the vertebra above', innervation: DORSAL, action: 'Assists extension; proprioception', spine: THORACIC },
   'lateral-lumbar-intertransversarius': { group: 'Deep spinal', region: T, origin: 'Transverse process of one lumbar vertebra', insertion: 'Transverse process of the vertebra above', innervation: 'Anterior rami (L1–L4)', action: 'Lateral flexion; proprioception', spine: ['pelvis', ...LUMBAR] },

@@ -9,7 +9,8 @@ import { MUSCLE_INFO, hasMuscleInfo, muscleInfo } from '../app/lib/data/muscles'
 import { ACTIONS, parseRef } from '../app/lib/data/actions';
 import type { Structure } from '../app/lib/types';
 
-const list: Structure[] = JSON.parse(readFileSync('public/models/structures.json', 'utf8'));
+// MODELS_DIR=<dir> checks a build written elsewhere (MODELS_OUT of the model build).
+const list: Structure[] = JSON.parse(readFileSync(`${process.env.MODELS_DIR ?? 'public/models'}/structures.json`, 'utf8'));
 const map = new Map(list.map((s) => [s.id, s]));
 let fail = 0;
 const bad = (m: string) => { fail++; console.log('FAIL', m); };

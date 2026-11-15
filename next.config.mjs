@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, // the WebGL viewer owns a canvas; avoid the dev double-mount
+  // The WebGL viewer tolerates the dev double-mount: dispose() releases everything and a late load() never settles.
+  reactStrictMode: true,
   typescript: { ignoreBuildErrors: false },
 };
 export default nextConfig;

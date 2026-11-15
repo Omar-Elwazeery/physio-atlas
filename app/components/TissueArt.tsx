@@ -10,8 +10,61 @@ export default function TissueArt({ kind }: { kind: TissueKind }) {
   const common = { viewBox: '0 0 200 200', role: 'img' as const, width: '100%', height: '100%' };
   if (kind === 'muscle') return <Muscle uid={uid} {...common} />;
   if (kind === 'bone') return <BoneTissue uid={uid} {...common} />;
-  if (kind === 'disc') return <Disc uid={uid} {...common} />;
+  if (kind === 'disc' || kind === 'fibrocartilage') return <Disc uid={uid} {...common} />;
+  if (kind === 'ligament' || kind === 'capsule' || kind === 'retinaculum' || kind === 'fascia') return <DenseFibres uid={uid} {...common} />;
+  if (kind === 'bursa' || kind === 'sheath') return <Synovial uid={uid} {...common} />;
+  if (kind === 'fatpad') return <Fat uid={uid} {...common} />;
   return <Cartilage uid={uid} {...common} />;
+}
+
+/** Dense regular connective tissue: wavy parallel collagen bundles with rows of flattened fibroblast nuclei. */
+function DenseFibres({ uid, ...svg }: P) {
+  return (
+    <svg {...svg} aria-label="Dense connective tissue: parallel collagen fibres with fibroblasts">
+      <defs><radialGradient id={`${uid}g`} cx="40%" cy="30%"><stop offset="0" stopColor="#fffdf8" /><stop offset="1" stopColor="#ece5d6" /></radialGradient></defs>
+      <rect width="200" height="200" rx="26" fill={`url(#${uid}g)`} />
+      {Array.from({ length: 13 }, (_, i) => {
+        const y = 24 + i * 12;
+        return <path key={i} d={`M 10 ${y} q 12 -5 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0 t 24 0`} stroke={i % 2 ? '#c9b99c' : '#b8a483'} strokeWidth="5" fill="none" strokeLinecap="round" />;
+      })}
+      {Array.from({ length: 12 }, (_, i) => <ellipse key={i} cx={30 + ((i * 47) % 150)} cy={30 + i * 12} rx="7" ry="1.8" fill="#6d4a8f" opacity=".8" />)}
+      <text x="100" y="192" textAnchor="middle" fontSize="9" fill="#8d847c" fontFamily="sans-serif" letterSpacing=".1em">COLLAGEN · FIBROBLASTS</text>
+    </svg>
+  );
+}
+
+/** A synovial sac: membrane with a film of fluid, between a tendon and bone. */
+function Synovial({ uid, ...svg }: P) {
+  return (
+    <svg {...svg} aria-label="Synovial sac between a tendon and bone">
+      <defs><radialGradient id={`${uid}g`} cx="40%" cy="30%"><stop offset="0" stopColor="#f6fbff" /><stop offset="1" stopColor="#dbe8f3" /></radialGradient></defs>
+      <rect width="200" height="200" rx="26" fill={`url(#${uid}g)`} />
+      <rect x="14" y="136" width="172" height="40" rx="8" fill="#e8dcc6" stroke="#b99a78" />
+      <rect x="14" y="40" width="172" height="34" rx="17" fill="#ede6d6" stroke="#b8a483" />
+      {Array.from({ length: 6 }, (_, i) => <line key={i} x1="24" y1={46 + i * 5} x2="176" y2={46 + i * 5} stroke="#c9b99c" strokeWidth="1.4" />)}
+      <ellipse cx="100" cy="106" rx="78" ry="22" fill="#9cc3e4" opacity=".55" stroke="#4f86b5" strokeWidth="2" />
+      <ellipse cx="100" cy="106" rx="66" ry="11" fill="#c9e1f4" opacity=".8" />
+      <text x="100" y="192" textAnchor="middle" fontSize="9" fill="#8d847c" fontFamily="sans-serif" letterSpacing=".1em">TENDON · SYNOVIAL SAC · BONE</text>
+    </svg>
+  );
+}
+
+/** Adipose tissue: large fat cells with their nuclei pressed to the edge. */
+function Fat({ uid, ...svg }: P) {
+  const cells: [number, number, number][] = [[50, 52, 28], [110, 46, 30], [165, 60, 24], [40, 116, 26], [100, 108, 32], [162, 120, 28], [64, 168, 22], [126, 166, 24]];
+  return (
+    <svg {...svg} aria-label="Adipose tissue: fat cells">
+      <defs><radialGradient id={`${uid}g`} cx="40%" cy="30%"><stop offset="0" stopColor="#fffcf0" /><stop offset="1" stopColor="#f1e3b4" /></radialGradient></defs>
+      <rect width="200" height="200" rx="26" fill={`url(#${uid}g)`} />
+      {cells.map(([x, y, r], i) => (
+        <g key={i}>
+          <circle cx={x} cy={y} r={r} fill="#fbf1cf" stroke="#d6b35a" strokeWidth="1.5" />
+          <ellipse cx={x + r * 0.7} cy={y - r * 0.55} rx="4" ry="2.2" fill="#6d4a8f" opacity=".8" />
+        </g>
+      ))}
+      <text x="100" y="196" textAnchor="middle" fontSize="9" fill="#8d847c" fontFamily="sans-serif" letterSpacing=".1em">FAT CELLS</text>
+    </svg>
+  );
 }
 
 type P = { uid: string; viewBox: string; role: 'img'; width: string; height: string };
